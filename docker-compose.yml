@@ -34,6 +34,7 @@ services:
       - DATABASE_URL=postgresql://paperclip:paperclip_password@postgres:5432/paperclip_db
       - ADAPTER_TYPE=http 
       - ADAPTER_WEBHOOK_URL=http://webhook-proxy:8080/invoke
+      - BETTER_AUTH_SECRET=vh9f8sd7f98s7dhf98s7dhf-paperclip-secret # Required for paperclip Auth
     ports:
       # ОПТИМІЗАЦІЯ ДЛЯ ІСНУЮЧОГО VPS: Віддаємо Paperclip на порту 3100
       # Щоб не викликати конфлікт з вашим основним портом 80 (який швидше за все зайнятий вашими іншими сайтами).
