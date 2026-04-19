@@ -1,0 +1,90 @@
+version: "3.9"
+
+# Спеціальна мережа для безпеки, щоб закрити сервіси від прямого доступу з інтернету
+networks:
+  agent_internal_net:
+    driver: bridge
+
+services:
+  # Налаштування POSTGRES для VPS
+  postgres:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: paperclip
+      POSTGRES_PASSWORD: paperclip_password
+      POSTGRES_DB: paperclip_db
+    # ОПТИМІЗАЦІЯ: Порти в інтернет прибрано, щоб БД не хакнули 
+    # Сервіс доступний лише по внутрішній мережі Docker
+    networks:
+      - agent_internal_net
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Ядро системи — Paperclip
+  paperclip:
+    build: https://github.com/paperclipai/paperclip.git
+    restart: unless-stopped
+    environment:
+      - DATABASE_URL=postgresql://paperclip:paperclip_password@postgres:5432/paperclip_db
+      - ADAPTER_TYPE=http 
+      - ADAPTER_WEBHOOK_URL=http://webhook-proxy:8080/invoke
+    ports:
+      # ОПТИМІЗАЦІЯ ДЛЯ ІСНУЮЧОГО VPS: Віддаємо Paperclip на порту 3100
+      # Щоб не викликати конфлікт з вашим основним портом 80 (який швидше за все зайнятий вашими іншими сайтами).
+      # Ви зможете проксіювати свій домен на цей порт (наприклад, через ваш існуючий Nginx чи Traefik).
+      - "3100:3100"
+    networks:
+      - agent_internal_net
+    depends_on:
+      - postgres
+      - mempalace-mcp
+      - webhook-proxy
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+  # MemPalace MCP Server
+  mempalace-mcp:
+    build: 
+      context: ./mempalace-docker
+    restart: unless-stopped
+    # ОПТИМІЗАЦІЯ: Прибираємо публічні порти, він спілкується лише внутрішньо
+    networks:
+      - agent_internal_net
+    volumes:
+      - mempalace_data:/root/.mempalace
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Наш API-транслятор
+  webhook-proxy:
+    build:
+      context: ./webhook-proxy
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock 
+    environment:
+      - MEMPALACE_URL=http://mempalace-mcp:5000
+    networks:
+      - agent_internal_net
+    # ОПТИМІЗАЦІЯ: Цей сервіс не має "стирчати" назовні, paperclip звертатиметься до нього по внутрішній IP
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+volumes:
+  postgres_data:
+  mempalace_data:

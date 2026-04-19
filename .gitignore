@@ -1,0 +1,19 @@
+# Environments
+.env
+.env.local
+
+# IDEs
+.idea/
+.vscode/
+
+# Python caching
+__pycache__/
+*.pyc
+
+# Docker volumes / local data
+mempalace_data/
+postgres_data/
+
+# OS generated files
+.DS_Store
+Thumbs.db
