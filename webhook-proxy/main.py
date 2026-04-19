@@ -9,7 +9,8 @@ app = FastAPI()
 # Connect to the docker socket mounted from host
 client = docker.from_env()
 
-MEMPALACE_URL = os.getenv("MEMPALACE_URL", "http://mempalace-mcp:5000")
+# Get configured image or fallback
+IMAGE_NAME = os.getenv("OPENCLAW_IMAGE", "local-openclaw-with-mempalace")
 
 def spawn_openclaw_worker(agent_id: str, role: str, task: str):
     """
@@ -18,17 +19,20 @@ def spawn_openclaw_worker(agent_id: str, role: str, task: str):
     print(f"Spawning OpenClaw for Wing: {role}, Task: {task}")
     try:
         container = client.containers.run(
-            "ghcr.io/openclaw/openclaw:latest",
+            IMAGE_NAME,
             command=[
                 "--non-interactive",
                 "--task", task,
-                "--mcp-server", MEMPALACE_URL,
+                "--mcp-server", "python3 -m mempalace.mcp_server", # Direct internal execution!
                 "--wing", role
             ],
             environment={
                 "ANTHROPIC_API_KEY": os.getenv("ANTHROPIC_API_KEY", "")
             },
             network_mode="system_agent_internal_net", # Attach to isolated VPS network
+            volumes={
+                "system_mempalace_data": {"bind": "/root/.mempalace", "mode": "rw"} # Share global memory natively!
+            },
             detach=True,
             remove=True # Auto-cleanup when done
         )

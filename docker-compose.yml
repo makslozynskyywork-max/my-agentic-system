@@ -44,29 +44,21 @@ services:
       - agent_internal_net
     depends_on:
       - postgres
-      - mempalace-mcp
       - webhook-proxy
+      - openclaw-build
     logging:
       driver: "json-file"
       options:
         max-size: "20m"
         max-file: "5"
 
-  # MemPalace MCP Server
-  mempalace-mcp:
-    build: 
-      context: ./mempalace-docker
-    restart: unless-stopped
-    # ОПТИМІЗАЦІЯ: Прибираємо публічні порти, він спілкується лише внутрішньо
-    networks:
-      - agent_internal_net
-    volumes:
-      - mempalace_data:/root/.mempalace
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
+  # Збірка кастомного OpenClaw з вбудованим MemPalace (щоб не мати проблем з HTTP SSE розпізнаванням)
+  openclaw-build:
+    build:
+      context: ./openclaw-docker
+    image: local-openclaw-with-mempalace
+    # Контейнер просто збирає образ і виходить (він нам потрібен лише як образ для спавна)
+    command: ["echo", "OpenClaw image successfully built"]
 
   # Наш API-транслятор
   webhook-proxy:
@@ -76,7 +68,8 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock 
     environment:
-      - MEMPALACE_URL=http://mempalace-mcp:5000
+      # Змінна MEMPALACE_URL більше не потрібна, бо MemPalace вбудований безпосередньо в контейнер OpenClaw
+      - OPENCLAW_IMAGE=local-openclaw-with-mempalace
     networks:
       - agent_internal_net
     # ОПТИМІЗАЦІЯ: Цей сервіс не має "стирчати" назовні, paperclip звертатиметься до нього по внутрішній IP
